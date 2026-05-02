@@ -36,67 +36,93 @@
     </div>
 
     <script>
-        const MY_URL = 'https://toeqmqoswcjbiratydnx.supabase.co';
-        const MY_KEY = 'sb_publishable_r_jeI0wGwc_zIOY7fo5zlA_KyYQlOyG';
-        const db = window.supabase.createClient(MY_URL, MY_KEY);
+    const MY_URL = 'https://toeqmqoswcjbiratydnx.supabase.co';
+    const MY_KEY = 'sb_publishable_r_jeI0wGwc_zIOY7fo5zlA_KyYQlOyG';
+    const db = window.supabase.createClient(MY_URL, MY_KEY);
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const currentPostId = urlParams.get('id') || 'demo';
-        const rawText = urlParams.get('text') || 'Текст исповеди...';
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentPostId = urlParams.get('id') || 'demo';
+    const rawText = urlParams.get('text') || 'Текст исповеди...';
+    
+    let replyingToId = null;
+
+    // 1. Генерируем или достаем из памяти твой личный ID для этой исповедальни
+    let myId = localStorage.getItem('comeclean_uid');
+    if (!myId) {
+        myId = 'u_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('comeclean_uid', myId);
+    }
+
+    function drawHeader() {
+        var txt = decodeURIComponent(rawText);
+        var html = '<div class="main-post">' +
+                   '<div class="main-post-title">Исповедь #' + currentPostId.slice(-4) + '</div>' +
+                   '<div class="main-post-text">' + txt + '</div>' +
+                   '</div>';
+        document.getElementById('header-post').innerHTML = html;
+    }
+
+    async function showComments() {
+        const { data } = await db.from('comments').select('*').eq('post_id', currentPostId).order('created_at', { ascending: true });
+        const container = document.getElementById('list');
+        container.innerHTML = '';
         
-        let replyingToId = null;
+        if (data && data.length > 0) {
+            // Создаем список уникальных авторов в этом обсуждении
+            var authors = [];
+            data.forEach(function(item) {
+                if (item.user_id && authors.indexOf(item.user_id) === -1) {
+                    authors.push(item.user_id);
+                }
+            });
 
-        function drawHeader() {
-            var txt = decodeURIComponent(rawText);
-            var html = '<div class="main-post">' +
-                       '<div class="main-post-title">Исповедь #' + currentPostId.slice(-4) + '</div>' +
-                       '<div class="main-post-text">' + txt + '</div>' +
-                       '</div>';
-            document.getElementById('header-post').innerHTML = html;
-        }
+            data.forEach(function(item) {
+                // Определяем номер батюшки по его ID в списке авторов
+                var authorNum = authors.indexOf(item.user_id) + 1;
+                if (authorNum === 0) authorNum = '?'; // На случай старых записей без ID
 
-        async function showComments() {
-            const { data } = await db.from('comments').select('*').eq('post_id', currentPostId).order('created_at', { ascending: true });
-            const container = document.getElementById('list');
-            container.innerHTML = '';
-            if (data && data.length > 0) {
-                data.forEach(function(item, idx) {
-                    var div = document.createElement('div');
-                    div.className = item.parent_id ? 'msg-container reply-msg' : 'msg-container';
-                    div.innerHTML = '<div class="msg">' +
-                                    '<div class="avatar"></div>' +
-                                    '<div class="content">' +
-                                    '<span class="author-name">батюшка_' + (idx + 1) + '</span>' +
-                                    '<div class="text">' + item.text + '</div>' +
-                                    '<button class="reply-btn" onclick="prepareReply(\'' + item.id + '\', \'батюшка_' + (idx + 1) + '\')">ответить</button>' +
-                                    '</div></div>';
-                    container.appendChild(div);
-                });
-            } else { container.innerText = 'Здесь пока пусто...'; }
-        }
+                var div = document.createElement('div');
+                div.className = item.parent_id ? 'msg-container reply-msg' : 'msg-container';
+                div.innerHTML = '<div class="msg">' +
+                                '<div class="avatar"></div>' +
+                                '<div class="content">' +
+                                '<span class="author-name">батюшка_' + authorNum + '</span>' +
+                                '<div class="text">' + item.text + '</div>' +
+                                '<button class="reply-btn" onclick="prepareReply(\'' + item.id + '\', \'батюшка_' + authorNum + '\')">ответить</button>' +
+                                '</div></div>';
+                container.appendChild(div);
+            });
+        } else { container.innerText = 'Здесь пока пусто...'; }
+    }
 
-        function prepareReply(id, name) {
-            replyingToId = id;
-            document.getElementById('reply-to-info').style.display = 'block';
-            document.getElementById('reply-author').innerText = name;
-            document.getElementById('comm-input').focus();
-        }
+    function prepareReply(id, name) {
+        replyingToId = id;
+        document.getElementById('reply-to-info').style.display = 'block';
+        document.getElementById('reply-author').innerText = name;
+        document.getElementById('comm-input').focus();
+    }
 
-        function cancelReply() {
-            replyingToId = null;
-            document.getElementById('reply-to-info').style.display = 'none';
-        }
+    function cancelReply() {
+        replyingToId = null;
+        document.getElementById('reply-to-info').style.display = 'none';
+    }
 
-        async function doSend() {
-            const el = document.getElementById('comm-input');
-            const txt = el.value.trim();
-            if (!txt) return;
-            const { error } = await db.from('comments').insert([{ text: txt, post_id: currentPostId, parent_id: replyingToId }]);
-            if (error) { alert('Ошибка! Проверь RLS.'); } else { el.value = ''; cancelReply(); showComments(); }
-        }
+    async function doSend() {
+        const el = document.getElementById('comm-input');
+        const txt = el.value.trim();
+        if (!txt) return;
+        
+        // Отправляем комментарий вместе с твоим личным ID
+        const { error } = await db.from('comments').insert([{ 
+            text: txt, 
+            post_id: currentPostId, 
+            parent_id: replyingToId,
+            user_id: myId 
+        }]);
+        
+        if (error) { alert('Ошибка! Проверь RLS.'); } else { el.value = ''; cancelReply(); showComments(); }
+    }
 
-        drawHeader();
-        showComments();
-    </script>
-</body>
-</html>
+    drawHeader();
+    showComments();
+</script>
