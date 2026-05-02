@@ -125,4 +125,16 @@
 
     drawHeader();
     showComments();
+// Слушаем обновления в реальном времени
+db.channel('public:comments')
+  .on('postgres_changes', { 
+      event: 'INSERT', 
+      schema: 'public', 
+      table: 'comments',
+      filter: 'post_id=eq.' + currentPostId // Слушаем только этот пост
+  }, function(payload) {
+      console.log('Пришел новый батюшка!', payload);
+      showComments(); // Перерисовываем список
+  })
+  .subscribe();
 </script>
