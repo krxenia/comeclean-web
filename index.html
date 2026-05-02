@@ -10,9 +10,9 @@
         .main-post { background: #1a1a1a; padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 1px solid #333; }
         .main-post-title { color: #888; font-size: 0.8em; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
         .main-post-text { color: white; font-size: 1.1em; line-height: 1.4; }
-        .msg-container { margin-bottom: 15px; position: relative; }
-        .msg { background: #161616; padding: 12px; border-radius: 12px; display: flex; gap: 12px; position: relative; }
-        .reply-msg { margin-left: 30px; border-left: 1px solid #333; padding-left: 15px; margin-top: -5px; }
+        .msg-container { margin-bottom: 15px; }
+        .msg { background: #161616; padding: 12px; border-radius: 12px; display: flex; gap: 12px; }
+        .reply-msg { margin-left: 30px; border-left: 1px solid #333; padding-left: 15px; margin-top: 5px; }
         .avatar { width: 35px; height: 35px; background: #333; border-radius: 50%; flex-shrink: 0; }
         .author-name { font-weight: bold; color: #eee; font-size: 0.9em; margin-bottom: 4px; display: block; }
         .text { font-size: 0.95em; line-height: 1.4; }
@@ -47,11 +47,12 @@
         let replyingToId = null;
 
         function drawHeader() {
-            document.getElementById('header-post').innerHTML = 
-                <div class="main-post">
-                    <div class="main-post-title">Исповедь #${currentPostId.slice(-4)}</div>
-                    <div class="main-post-text">${decodeURIComponent(rawText)}</div>
-                </div>;
+            var txt = decodeURIComponent(rawText);
+            var html = '<div class="main-post">' +
+                       '<div class="main-post-title">Исповедь #' + currentPostId.slice(-4) + '</div>' +
+                       '<div class="main-post-text">' + txt + '</div>' +
+                       '</div>';
+            document.getElementById('header-post').innerHTML = html;
         }
 
         async function showComments() {
@@ -59,18 +60,16 @@
             const container = document.getElementById('list');
             container.innerHTML = '';
             if (data && data.length > 0) {
-                data.forEach((item, idx) => {
-                    const div = document.createElement('div');
+                data.forEach(function(item, idx) {
+                    var div = document.createElement('div');
                     div.className = item.parent_id ? 'msg-container reply-msg' : 'msg-container';
-                    div.innerHTML = `
-<div class="msg">
-                            <div class="avatar"></div>
-                            <div class="content">
-                                <span class="author-name">батюшка_${idx + 1}</span>
-                                <div class="text">${item.text}</div>
-                                <button class="reply-btn" onclick="prepareReply('${item.id}', 'батюшка_${idx + 1}')">ответить</button>
-                            </div>
-                        </div>`;
+                    div.innerHTML = '<div class="msg">' +
+                                    '<div class="avatar"></div>' +
+                                    '<div class="content">' +
+                                    '<span class="author-name">батюшка_' + (idx + 1) + '</span>' +
+                                    '<div class="text">' + item.text + '</div>' +
+                                    '<button class="reply-btn" onclick="prepareReply(\'' + item.id + '\', \'батюшка_' + (idx + 1) + '\')">ответить</button>' +
+                                    '</div></div>';
                     container.appendChild(div);
                 });
             } else { container.innerText = 'Здесь пока пусто...'; }
@@ -80,6 +79,7 @@
             replyingToId = id;
             document.getElementById('reply-to-info').style.display = 'block';
             document.getElementById('reply-author').innerText = name;
+            document.getElementById('comm-input').focus();
         }
 
         function cancelReply() {
