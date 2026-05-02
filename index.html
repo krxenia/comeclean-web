@@ -7,43 +7,28 @@
     <style>
         body { background: #0a0a0a; color: #b0b0b0; font-family: sans-serif; padding: 15px; margin: 0; }
         #list { margin-bottom: 100px; }
-        
-        /* Главный пост (Исповедь) */
         .main-post { background: #1a1a1a; padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 1px solid #333; }
         .main-post-title { color: #888; font-size: 0.8em; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
         .main-post-text { color: white; font-size: 1.1em; line-height: 1.4; }
-
-        /* Комментарии */
         .msg-container { margin-bottom: 15px; position: relative; }
         .msg { background: #161616; padding: 12px; border-radius: 12px; display: flex; gap: 12px; position: relative; }
         .reply-msg { margin-left: 30px; border-left: 1px solid #333; padding-left: 15px; margin-top: -5px; }
-        
         .avatar { width: 35px; height: 35px; background: #333; border-radius: 50%; flex-shrink: 0; }
-        .content { flex-grow: 1; }
         .author-name { font-weight: bold; color: #eee; font-size: 0.9em; margin-bottom: 4px; display: block; }
         .text { font-size: 0.95em; line-height: 1.4; }
-        
         .reply-btn { background: none; border: none; color: #555; font-size: 0.8em; padding: 5px 0; cursor: pointer; text-decoration: underline; }
-        
-        /* Панель ввода */
         .panel { position: fixed; bottom: 0; left: 0; right: 0; background: #0f0f0f; padding: 15px; border-top: 1px solid #222; }
         .reply-info { font-size: 0.8em; color: #666; margin-bottom: 8px; display: none; }
         .input-row { display: flex; gap: 10px; align-items: center; }
         input { background: #1a1a1a; border: none; color: white; padding: 12px 18px; flex-grow: 1; border-radius: 25px; outline: none; }
         .send-btn { background: none; border: none; color: #888; font-size: 1.5em; cursor: pointer; }
-        
-        .cancel-reply { color: #cc4444; margin-left: 10px; cursor: pointer; }
     </style>
 </head>
 <body>
     <div id="header-post"></div>
-    
     <div id="list">Загрузка обсуждения...</div>
-
     <div class="panel">
-        <div id="reply-to-info" class="reply-info">
-            Ответ батюшке <span id="reply-author"></span> <span class="cancel-reply" onclick="cancelReply()">✕</span>
-        </div>
+        <div id="reply-to-info" class="reply-info">Ответ <span id="reply-author"></span> <span onclick="cancelReply()" style="cursor:pointer">✕</span></div>
         <div class="input-row">
             <input type="text" id="comm-input" placeholder="напиши что-нибудь..." onkeypress="if(event.key==='Enter') doSend()">
             <button class="send-btn" onclick="doSend()">➔</button>
@@ -55,92 +40,46 @@
         const MY_KEY = 'sb_publishable_r_jeI0wGwc_zIOY7fo5zlA_KyYQlOyG';
         const db = window.supabase.createClient(MY_URL, MY_KEY);
 
-        // Получаем параметры из ссылки
         const urlParams = new URLSearchParams(window.location.search);
         const currentPostId = urlParams.get('id') || 'demo';
-        const postText = urlParams.get('text') || 'Текст исповеди потерялся в темноте...';
+        const rawText = urlParams.get('text') || 'Текст исповеди...';
         
-        let replyingToId = null; // ID комментария, на который отвечаем
+        let replyingToId = null;
 
-        // 1. Отрисовка главного поста
         function drawHeader() {
-            const header = document.getElementById('header-post');
-            header.innerHTML = 
+            document.getElementById('header-post').innerHTML = 
                 <div class="main-post">
                     <div class="main-post-title">Исповедь #${currentPostId.slice(-4)}</div>
-                    <div class="main-post-text">${decodeURIComponent(postText)}</div>
-                </div>
-            ;
+                    <div class="main-post-text">${decodeURIComponent(rawText)}</div>
+                </div>;
         }
 
-        // 2. Логика "Батюшек" (нумерация авторов)
-        function getAuthorName(authorId, allComments) {
-            const authors = [...new Set(allComments.map(c => c.user_id))]; // user_id должен быть в таблице
-            const index = authors.indexOf(authorId);
-            return батюшка_${index + 1};
-        }
-// 3. Загрузка комментариев
         async function showComments() {
-            const { data, error } = await db.from('comments')
-                .select('*')
-                .eq('post_id', currentPostId)
-                .order('created_at', { ascending: true });
-
+            const { data } = await db.from('comments').select('*').eq('post_id', currentPostId).order('created_at', { ascending: true });
             const container = document.getElementById('list');
             container.innerHTML = '';
-
             if (data && data.length > 0) {
-                // Создаем карту для древовидной структуры
-                const map = {};
-                data.forEach(c => map[c.id] = {...c, replies: []});
-                const roots = [];
-
-                data.forEach(c => {
-                    // Если у коммента есть parent_id, кладем его в replies родителя
-                    if (c.parent_id && map[c.parent_id]) {
-                        map[c.parent_id].replies.push(map[c.id]);
-                    } else {
-                        roots.push(map[c.id]);
-                    }
-                });
-
-                // Функция для рендера (рекурсивная для вложенности)
-                function renderTree(items, isReply = false) {
-                    items.forEach(item => {
-                        const div = document.createElement('div');
-                        div.className = isReply ? 'msg-container reply-msg' : 'msg-container';
-                        
-                        // Имя автора (пока просто по порядку появления в базе для этого поста)
-                        const authorName = батюшка_${data.findIndex(x => x.user_id === item.user_id) + 1};
-                        // Если user_id нет, временно будем считать по id самого коммента для теста:
-                        const tempName = батюшка_${data.indexOf(data.find(x => x.id === item.id)) + 1};
-
-                        div.innerHTML = 
-                            <div class="msg">
-                                <div class="avatar"></div>
-                                <div class="content">
-                                    <span class="author-name">${tempName}</span>
-                                    <div class="text">${item.text}</div>
-                                    <button class="reply-btn" onclick="prepareReply('${item.id}', '${tempName}')">ответить</button>
-                                </div>
+                data.forEach((item, idx) => {
+                    const div = document.createElement('div');
+                    div.className = item.parent_id ? 'msg-container reply-msg' : 'msg-container';
+                    div.innerHTML = `
+<div class="msg">
+                            <div class="avatar"></div>
+                            <div class="content">
+                                <span class="author-name">батюшка_${idx + 1}</span>
+                                <div class="text">${item.text}</div>
+                                <button class="reply-btn" onclick="prepareReply('${item.id}', 'батюшка_${idx + 1}')">ответить</button>
                             </div>
-                        ;
-                        container.appendChild(div);
-                        if (item.replies.length > 0) renderTree(item.replies, true);
-                    });
-                }
-                renderTree(roots);
-            } else {
-                container.innerText = 'Здесь пока пусто... стань первым батюшкой.';
-            }
+                        </div>`;
+                    container.appendChild(div);
+                });
+            } else { container.innerText = 'Здесь пока пусто...'; }
         }
 
-        // 4. Подготовка ответа
         function prepareReply(id, name) {
             replyingToId = id;
             document.getElementById('reply-to-info').style.display = 'block';
             document.getElementById('reply-author').innerText = name;
-            document.getElementById('comm-input').focus();
         }
 
         function cancelReply() {
@@ -148,34 +87,12 @@
             document.getElementById('reply-to-info').style.display = 'none';
         }
 
-        // 5. Отправка
         async function doSend() {
             const el = document.getElementById('comm-input');
             const txt = el.value.trim();
             if (!txt) return;
-
-            // user_id — имитируем уникальность для этой сессии (потом заменим на ТГ-айди)
-            let myId = localStorage.getItem('my_temp_id');
-            if (!myId) {
-                myId = Math.random().toString(36).substring(7);
-                localStorage.setItem('my_temp_id', myId);
-            }
-
-            const { error } = await db.from('comments').insert([{ 
-                text: txt, 
-                post_id: currentPostId,
-                parent_id: 
-replyingToId, // Ссылка на родителя для ответов
-                user_id: myId
-            }]);
-            
-            if (error) {
-                alert('Ошибка базы. Убедись, что в таблице есть колонки parent_id и user_id!');
-            } else {
-                el.value = '';
-                cancelReply();
-                showComments();
-            }
+            const { error } = await db.from('comments').insert([{ text: txt, post_id: currentPostId, parent_id: replyingToId }]);
+            if (error) { alert('Ошибка! Проверь RLS.'); } else { el.value = ''; cancelReply(); showComments(); }
         }
 
         drawHeader();
