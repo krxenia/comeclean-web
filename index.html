@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>ComeClean Discussion</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { background: #0a0a0a; color: #b0b0b0; font-family: sans-serif; padding: 20px; }
+        #list { margin-bottom: 80px; }
+        .msg { background: #161616; padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #333; }
+        .panel { position: fixed; bottom: 0; left: 0; right: 0; background: #0f0f0f; padding: 15px; display: flex; gap: 10px; }
+        input { background: #1a1a1a; border: none; color: white; padding: 10px; flex-grow: 1; border-radius: 20px; outline: none; }
+        button { background: none; border: none; color: #666; font-size: 1.5em; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="list">Загрузка комментариев...</div>
+    <div class="panel">
+        <input type="text" id="comm-input" placeholder="напиши что-нибудь..." onkeypress="if(event.key==='Enter') doSend()">
+        <button onclick="doSend()">➔</button>
+    </div>
+
+    <script>
+        // Используем другие имена переменных, чтобы не было конфликтов
+        const MY_URL = 'https://toeqmqoswcjbiratydnx.supabase.co';
+        const MY_KEY = 'sb_publishable_r_jeI0wGwc_zIOY7fo5zlA_KyYQlOyG';
+        
+        // Создаем подключение
+        const db = window.supabase.createClient(MY_URL, MY_KEY);
+
+        async function showComments() {
+            const { data } = await db.from('comments').select('*').order('created_at', { ascending: true });
+            const container = document.getElementById('list');
+            container.innerHTML = '';
+            if (data && data.length > 0) {
+                data.forEach(item => {
+                    const d = document.createElement('div');
+                    d.className = 'msg';
+                    d.innerText = item.text;
+                    container.appendChild(d);
+                });
+            } else {
+                container.innerText = 'Здесь пока пусто...';
+            }
+        }
+
+        async function doSend() {
+            const el = document.getElementById('comm-input');
+            const txt = el.value.trim();
+            if (!txt) return;
+
+            const { error } = await db.from('comments').insert([{ text: txt, post_id: '1' }]);
+            
+            if (error) {
+                console.error('Ошибка:', error);
+                alert('База отклонила запрос. Проверь RLS в Supabase!');
+            } else {
+                el.value = '';
+                showComments();
+            }
+        }
+
+        showComments();
+    </script>
+</body>
+</html>
