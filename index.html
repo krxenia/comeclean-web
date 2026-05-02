@@ -79,7 +79,7 @@
             const index = authors.indexOf(authorId);
             return батюшка_${index + 1};
         }
-[03.05.2026 1:01] Ксю: // 3. Загрузка комментариев
+// 3. Загрузка комментариев
         async function showComments() {
             const { data, error } = await db.from('comments')
                 .select('*')
@@ -164,7 +164,8 @@
             const { error } = await db.from('comments').insert([{ 
                 text: txt, 
                 post_id: currentPostId,
-[03.05.2026 1:01] Ксю: parent_id: replyingToId, // Ссылка на родителя для ответов
+                parent_id: 
+replyingToId, // Ссылка на родителя для ответов
                 user_id: myId
             }]);
             
