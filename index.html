@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ComeClean Discussion</title>
@@ -127,6 +128,21 @@ function drawHeader() {
         }
 
         async function doSend() {
+             const el = document.getElementById('comm-input');
+    const txt = el.value.trim();
+    if (!txt) return;
+
+    // Получаем ID пользователя прямо из Telegram
+    const tgUser = window.Telegram.WebApp.initDataUnsafe?.user;
+    const tgId = tgUser ? tgUser.id : null;
+
+    const { error } = await db.from('comments').insert([{ 
+        text: txt, 
+        post_id: currentPostId, 
+        parent_id: replyingToId,
+        user_id: myId,
+        tg_id: tgId // Добавляем это (предварительно создай колонку в Supabase!)
+    }]);
             const el = document.getElementById('comm-input');
             const txt = el.value.trim();
             if (!txt) return;
