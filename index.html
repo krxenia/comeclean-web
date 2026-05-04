@@ -129,32 +129,28 @@ function drawHeader() {
         }
 
         async function doSend() {
-    // 1. Объявляем 'el' только ОДИН раз в самом начале
     const el = document.getElementById('comm-input');
     const txt = el.value.trim();
     if (!txt) return;
 
-    // 2. Получаем ownerId из параметров ссылки
-    const ownerId = urlParams.get('owner');
+    // Твой личный ID (из телеграма)
+    const tgUser = window.Telegram.WebApp.initDataUnsafe?.user;
+    const myTgId = tgUser ? tgUser.id : null;
 
-    // 3. Отправляем в базу
+    // ID автора самого поста (из ссылки)
+    const params = new URLSearchParams(window.location.search);
+    const postOwnerId = params.get('owner');
+
     const { error } = await db.from('comments').insert([{ 
         text: txt, 
         post_id: currentPostId, 
-        parent_id: replyingToId,
+        parent_id: replyingToId, // Если мы отвечаем на коммент, тут будет его ID
         user_id: myId,
-        owner_id: ownerId 
+        tg_id: myTgId,      // ТВОЙ ID (чтобы тебе могли ответить)
+        owner_id: postOwnerId // ID автора исповеди
     }]);
     
-    if (error) { 
-        console.error(error);
-        alert('Ошибка!'); 
-    } else { 
-        // 4. Очищаем поле, используя уже созданную переменную 'el'
-        el.value = ''; 
-        cancelReply(); 
-        showComments(); 
-    }
+    // ... остальной код (очистка поля и т.д.)
 }
              
 
