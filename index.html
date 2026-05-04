@@ -74,13 +74,14 @@
             localStorage.setItem('comeclean_uid', myId);
         }
 function drawHeader() {
-            var txt = decodeURIComponent(rawText);
-            var html = '<div class="main-post">' +
-                       '<div class="main-post-title">Исповедь #' + currentPostId.slice(-4) + '</div>' +
-                       '<div class="main-post-text">' + txt + '</div>' +
-                       '</div>';
-            document.getElementById('header-post').innerHTML = html;
-        }
+    var txt = decodeURIComponent(rawText);
+    // Все теги должны быть внутри одинарных кавычек ' ' и соединяться плюсиками +
+    var html = '<div class="main-post">' +
+               '<div class="main-post-title">Исповедь #' + currentPostId.slice(-4) + '</div>' +
+               '<div class="main-post-text">' + txt + '</div>' +
+               '</div>';
+    document.getElementById('header-post').innerHTML = html;
+}
 
         async function showComments() {
             const { data } = await db.from('comments').select('*').eq('post_id', currentPostId).order('created_at', { ascending: true });
@@ -128,38 +129,34 @@ function drawHeader() {
         }
 
         async function doSend() {
-             const el = document.getElementById('comm-input');
+    // 1. Объявляем 'el' только ОДИН раз в самом начале
+    const el = document.getElementById('comm-input');
     const txt = el.value.trim();
     if (!txt) return;
 
-    // Получаем ID пользователя прямо из Telegram
-    const tgUser = window.Telegram.WebApp.initDataUnsafe?.user;
-    const tgId = tgUser ? tgUser.id : null;
+    // 2. Получаем ownerId из параметров ссылки
+    const ownerId = urlParams.get('owner');
 
+    // 3. Отправляем в базу
     const { error } = await db.from('comments').insert([{ 
         text: txt, 
         post_id: currentPostId, 
         parent_id: replyingToId,
         user_id: myId,
-        tg_id: tgId // Добавляем это (предварительно создай колонку в Supabase!)
+        owner_id: ownerId 
     }]);
-            const el = document.getElementById('comm-input');
-            const txt = el.value.trim();
-            if (!txt) return;
-            
-            const { error } = await db.from('comments').insert([{ 
-                text: txt, 
-                post_id: currentPostId, 
-                parent_id: replyingToId,
-                user_id: myId 
-            }]);
-            
-            if (error) { alert('Ошибка! Проверь RLS.'); } else { 
-                el.value = ''; 
-                cancelReply(); 
-                showComments(); 
-            }
-        }
+    
+    if (error) { 
+        console.error(error);
+        alert('Ошибка!'); 
+    } else { 
+        // 4. Очищаем поле, используя уже созданную переменную 'el'
+        el.value = ''; 
+        cancelReply(); 
+        showComments(); 
+    }
+}
+             
 
         // Real-time подписка
         db.channel('public:comments')
